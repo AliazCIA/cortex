@@ -1112,6 +1112,33 @@ PlasmoidItem {
                   event: "skill · opt-in",
                   detail: "Muda una sesión master COMPLETA de Claude Code a otro repo (caso canónico: los brain-master a cortex) sin dejar nada a medias: transcript re-anclado + cwd reescrito, cerebro del master migrado por su canal correcto, slug global y TODAS las referencias (masters.json target por-id, alias, symlink memory) corregidas de forma ATÓMICA, residuo quirúrgico barrido y doc=realidad. Úsala cuando un --resume cae en un folder muerto, un master quedó a medias (residuo + resume roto), o quieres consolidar los dos brain-master (Mac + Cachy) en cortex sin lobotomizarlos, sin fuga a un repo público ni duplicado divergente. Hermana de claude-proyecto-autocontenido (esa define DÓNDE vive el cerebro; ésta lo MUEVE de casa)." }
             ]
+        },
+        {
+            emoji: "🤖", title: "Agentes", color: "#9d7bd8",
+            subtitle: "trabajadores que Claude puede delegar en paralelo — integrados en Claude Code",
+            items: [
+                { emoji: "🃏", name: "claude", desc: "comodín: cualquier tarea que no encaje en un agente más específico",
+                  event: "agente · lo delega Claude",
+                  detail: "Agente de propósito general, el default cuando no se nombra uno más específico. Hereda todas las herramientas; úsalo para tareas sueltas que no encajan en Explore/Plan/general-purpose." },
+                { emoji: "🔭", name: "Explore", desc: "búsqueda read-only de amplio barrido; devuelve la conclusión, no vuelca archivos",
+                  event: "agente · lo delega Claude",
+                  detail: "Agente de SOLO LECTURA para barridos amplios (muchos archivos/carpetas/convenciones de nombres): localiza el código y devuelve la CONCLUSIÓN, no el volcado de archivos. Lee fragmentos — no revisa ni audita a fondo." },
+                { emoji: "🧰", name: "general-purpose", desc: "investigación y tareas multi-paso: busca y ejecuta cuando no sabes dónde está algo",
+                  event: "agente · lo delega Claude",
+                  detail: "Agente general para investigar preguntas complejas, buscar código y ejecutar tareas multi-paso. Úsalo cuando buscas una palabra/archivo y no confías en acertar en los primeros intentos. Acceso a todas las herramientas." },
+                { emoji: "🗺️", name: "Plan", desc: "arquitecto: diseña un plan de implementación paso a paso (read-only)",
+                  event: "agente · lo delega Claude",
+                  detail: "Agente arquitecto: diseña la estrategia de implementación de una tarea. Devuelve planes paso a paso, identifica archivos críticos y pondera trade-offs. Read-only (no edita)." },
+                { emoji: "📖", name: "claude-code-guide", desc: "resuelve dudas sobre Claude Code, el Agent SDK y la API de Claude",
+                  event: "agente · lo delega Claude",
+                  detail: "Responde preguntas sobre Claude Code (hooks, slash commands, MCP, settings, IDE), el Agent SDK y la API de Claude (Messages API, tool use, prompt caching, SDKs). Úsalo para dudas de '¿Claude puede…?' / '¿cómo hago…?'." },
+                { emoji: "⚙️", name: "statusline-setup", desc: "configura tu status line de Claude Code",
+                  event: "agente · lo delega Claude",
+                  detail: "Agente que configura la status line de Claude Code (el ajuste statusLine). Herramientas acotadas: leer y editar." },
+                { emoji: "🌿", name: "fork", desc: "clona tu contexto actual para seguir una rama de trabajo en paralelo",
+                  event: "agente · lo delega Claude",
+                  detail: "Clona tu contexto actual (el fork hereda toda la conversación) para seguir una rama de trabajo en paralelo en segundo plano, corriendo en tu mismo modelo." }
+            ]
         }
     ]
 
@@ -1133,6 +1160,9 @@ PlasmoidItem {
     // Los 4 rótulos de NORMA (pseudo-piezas, gobernados por hasNorms). NO viven en el MANIFEST ni se
     // retiran como skills/hooks → enumerarlos es legítimo (no es la lista drift-prone).
     readonly property var brainNormNames:   ["Definition of Done","Doc <= realidad","Flujo de git","Costo de delegación"]
+    // Agentes BUILT-IN del runtime de Claude Code (no viven en disco; cambian solo cuando Claude Code
+    // agrega/quita tipos). Estado "builtin": siempre disponibles → NO cuentan para la salud del cerebro.
+    readonly property var brainAgentNames:  ["claude","Explore","general-purpose","Plan","claude-code-guide","statusline-setup","fork"]
 
     // ---------- Pestaña BROKER (idx 6) ----------
     // El broker de terminal es un servicio de systemd --user que hasta hoy solo se veía y se tocaba
@@ -1402,6 +1432,7 @@ PlasmoidItem {
             return p && w ? "installed" : (p ? "presentNotWired" : "absent")
         }
         if (inArr(root.brainRepoHooks, name)) return "repoScoped"
+        if (inArr(root.brainAgentNames, name)) return "builtin"
         if (root.brainNormNames.indexOf(name) !== -1)
             return st.hasNorms ? "installed" : "absent"
         // Cualquier OTRO nombre es una SKILL: su estado SALE de la fuente viva (st.skills = los VIVOS
@@ -1418,6 +1449,7 @@ PlasmoidItem {
         var st = root.brainState
         if (!st) return true
         if (inArr(root.brainGlobalHooks, name) || inArr(root.brainRepoHooks, name)) return true
+        if (inArr(root.brainAgentNames, name)) return true
         if (root.brainNormNames.indexOf(name) !== -1) return true
         return inArr(st.skills, name)
     }
@@ -1428,18 +1460,21 @@ PlasmoidItem {
     function brainDot(s) {
         if (s === "installed") return "✓"
         if (s === "repoScoped") return "◈"
+        if (s === "builtin") return "●"
         if (s === "") return ""
         return "！"   // presentNotWired / absent / desconocido → faltante
     }
     function brainDotColor(s) {
         if (s === "installed") return "#3aa76d"
         if (s === "repoScoped") return Qt.rgba(0.290, 0.565, 0.851, 0.6)   // #4a90d9 @ 60%
+        if (s === "builtin") return "#9d7bd8"   // agente built-in: siempre disponible
         return "#dc3545"   // faltante (sin cablear / ausente / desconocido)
     }
     function brainStatusLabel(s) {
         if (s === "installed") return "instalado + cableado en tu ~/.claude"
         if (s === "presentNotWired") return "el script existe pero NO está cableado en settings.json"
         if (s === "repoScoped") return "viaja por repo: se copia al .claude/ de cada proyecto"
+        if (s === "builtin") return "integrado en Claude Code — siempre disponible"
         return "no instalado en tu ~/.claude"
     }
 
@@ -1457,7 +1492,8 @@ PlasmoidItem {
         var n = 0
         for (var i = 0; i < brainAllNames.length; i++) {
             if (!isBrainLive(brainAllNames[i])) continue   // retirados: fuera de la fuente viva → ni cuentan
-            if (brainStatus(brainAllNames[i]) !== "repoScoped") n++
+            var s = brainStatus(brainAllNames[i])
+            if (s !== "repoScoped" && s !== "builtin") n++   // builtin (agentes): siempre on → no son "salud"
         }
         return n
     }
