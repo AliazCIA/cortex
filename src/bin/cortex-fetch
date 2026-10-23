@@ -348,7 +348,7 @@ if [[ -n "$DAILY_JSON" ]]; then
         # proyecto = basename del cwd más RAÍZ (menor profundidad) visto en la
         # carpeta, tras colapsar lo que esté bajo ".claude/" y normalizar los
         # backslashes de rutas Windows heredadas; si nunca hubo cwd, el slug.
-        BEGIN { ns = split(slug, sp, "-"); slugLast = (ns > 0 ? sp[ns] : slug); bestDepth = 1000000; bestName = "" }
+        BEGIN { ns = split(slug, sp, "-"); slugLast = (ns > 0 ? sp[ns] : slug); bestDepth = 1000000; bestName = ""; soloTmp = 0 }
         {
           # Claude Code logs one jsonl line per CONTENT BLOCK de un turno del
           # asistente (thinking/tool_use/text), cada uno repitiendo el MISMO
@@ -367,9 +367,10 @@ if [[ -n "$DAILY_JSON" ]]; then
           else               date = sprintf("%04d-%02d-%02d", y, mo, da)
           if (match($0, /"cwd":"[^"]*"/)) {
             cwd = substr($0, RSTART + 7, RLENGTH - 8)
-            if (!(cwd ~ /^\/(private\/)?tmp\//)) {
+            if (cwd ~ /^\/(private\/)?tmp\//) soloTmp = 1
+            else {
               gsub(/\\\\/, "/", cwd)                 # rutas Windows heredadas: "\\" -> "/"
-              ix = index(cwd, "/.claude/"); if (ix > 0) cwd = substr(cwd, 1, ix - 1)
+              n = split("/.claude/ /.git-worktrees/ /.worktrees/ /.cortex-wt/", wd, " "); for (k = 1; k <= n; k++) { ix = index(cwd, wd[k]); if (ix > 0) cwd = substr(cwd, 1, ix - 1) }
               sub(/[\/]+$/, "", cwd)
               nd = split(cwd, pp, "/"); b = (nd > 0 ? pp[nd] : "")
               if (b != "" && nd < bestDepth) { bestDepth = nd; bestName = b }
@@ -380,7 +381,7 @@ if [[ -n "$DAILY_JSON" ]]; then
           if (match($0, /"output_tokens":[0-9]+/)) { s = substr($0, RSTART, RLENGTH); sub(/^"output_tokens":/, "", s); outv = s + 0 }
           I[date] += inv; O[date] += outv
         }
-        END { name = (bestName != "" ? bestName : slugLast); for (dt in I) printf "%s\t%s\t%d\t%d\n", name, dt, I[dt], O[dt] + 0 }
+        END { name = (bestName != "" ? bestName : (soloTmp ? "(worktrees)" : slugLast)); for (dt in I) printf "%s\t%s\t%d\t%d\n", name, dt, I[dt], O[dt] + 0 }
       ')"$'\n'
     done
   fi
